@@ -2350,7 +2350,40 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
     ThrottledInterval::new(i)
 }
 
+/// xview: settings built into this version of the app.
+///
+/// They go into the "overwrite" tables, which win over whatever is saved in
+/// the config file, and the settings screen shows them as locked. This runs
+/// at the very start of every process (GUI, service, server), the same point
+/// RustDesk applies its own custom-client config, so it is set before any
+/// config file or Windows service name is worked out.
+fn apply_xview_settings() {
+    // Rename the app. The installer, Windows service, install folder,
+    // window title and tray all take their name from this.
+    *config::APP_NAME.write().unwrap() = "xview".to_owned();
+
+    let mut settings = config::OVERWRITE_SETTINGS.write().unwrap();
+    // Listen for direct IP connections. This is how the phone reaches the
+    // laptop over Tailscale, without going through RustDesk's servers.
+    settings.insert(keys::OPTION_DIRECT_SERVER.to_owned(), "Y".to_owned());
+    // Only accept connections from Tailscale addresses (its IPv4 and IPv6
+    // ranges). Anyone else, even on the same Wi-Fi, is refused.
+    settings.insert(
+        keys::OPTION_WHITELIST.to_owned(),
+        "100.64.0.0/10,fd7a:115c:a1e0::/48".to_owned(),
+    );
+    // Never update itself: an update would replace xview with stock RustDesk.
+    settings.insert(keys::OPTION_ALLOW_AUTO_UPDATE.to_owned(), "N".to_owned());
+    drop(settings);
+    // And don't nag about new RustDesk versions either.
+    config::OVERWRITE_LOCAL_SETTINGS
+        .write()
+        .unwrap()
+        .insert(keys::OPTION_ENABLE_CHECK_UPDATE.to_owned(), "N".to_owned());
+}
+
 pub fn load_custom_client() {
+    apply_xview_settings();
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());
