@@ -24,6 +24,8 @@ import '../../models/platform_model.dart';
 import '../../utils/image.dart';
 import '../widgets/dialog.dart';
 import '../widgets/custom_scale_widget.dart';
+import '../../xview/remote_body.dart';
+import '../../xview/xview.dart';
 
 final initText = '1' * 1024;
 
@@ -459,7 +461,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
           floatingActionButtonLocation: keyboardIsVisible
               ? FABLocation(FloatingActionButtonLocation.endFloat, 0, -35)
               : null,
-          floatingActionButton: !showActionButton
+          floatingActionButton: isXviewPhone || !showActionButton
               ? null
               : FloatingActionButton(
                   mini: !keyboardIsVisible,
@@ -494,7 +496,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                           gFFI.ffiModel.tryShowAndroidActionsOverlay();
                           return Offstage();
                         }(),
-                  _bottomWidget(),
+                  isXviewPhone ? Offstage() : _bottomWidget(),
                   gFFI.ffiModel.pi.isSet.isFalse
                       ? emptyOverlay(MyTheme.canvasColor)
                       : Offstage(),
@@ -518,6 +520,11 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                                   _currentOrientation = orientation;
                                   gFFI.canvasModel.updateViewStyle();
                                 });
+                              }
+                              if (isXviewPhone) {
+                                return Container(
+                                    color: MyTheme.canvasColor,
+                                    child: _xviewBody());
                               }
                               return Container(
                                 color: MyTheme.canvasColor,
@@ -719,6 +726,33 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
           return paints;
         }()));
   }
+
+  // xview: the layout C screen, reusing RustDesk's picture, cursor and the
+  // hidden field the phone's own keyboard types into.
+  Widget _xviewBody() => XviewRemoteBody(
+        id: widget.id,
+        canvas: Stack(children: [
+          ImagePaint(ffiModel: gFFI.ffiModel),
+          if (showCursorPaint) CursorPaint(widget.id),
+        ]),
+        openPhoneKeyboard: openKeyboard,
+        phoneKeyboardField: SizedBox(
+          width: 0,
+          height: 0,
+          child: !_showEdit
+              ? Container()
+              : TextFormField(
+                  textInputAction: TextInputAction.newline,
+                  autocorrect: false,
+                  autofocus: true,
+                  focusNode: _mobileFocusNode,
+                  maxLines: null,
+                  controller: _textController,
+                  keyboardType: TextInputType.multiline,
+                  onChanged: handleSoftKeyboardInput,
+                ),
+        ),
+      );
 
   Widget getBodyForDesktopWithListener() {
     final ffiModel = Provider.of<FfiModel>(context);

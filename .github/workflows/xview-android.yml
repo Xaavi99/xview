@@ -38,6 +38,33 @@ jobs:
   generate-bridge:
     uses: ./.github/workflows/bridge.yml
 
+  # Runs beside the long Rust build, so Dart mistakes in the xview phone code
+  # show up in about ten minutes instead of at the end.
+  check-xview-dart:
+    needs: [generate-bridge]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.ANDROID_FLUTTER_VERSION }}
+
+      - name: Restore bridge files
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bridge-artifact
+          path: ./
+
+      - name: Analyze xview phone code
+        run: |
+          cd flutter
+          flutter pub get
+          flutter analyze --no-fatal-infos --no-fatal-warnings lib/xview lib/main.dart lib/mobile/pages/remote_page.dart
+
   build-xview-android:
     needs: [generate-bridge]
     runs-on: ubuntu-24.04
