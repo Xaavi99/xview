@@ -78,6 +78,17 @@ A white monitor outline with an X, on teal `#0F766E`. Chosen over two other opti
 - Certificate SHA-256: `dd8036ebaca0ef97a396bdbd61d0c13cc222123bdc6242a83ce98782c1e6f582`
 - If the secret is missing, the workflow falls back to a throwaway debug key and logs a warning. Updates then won't install over the top.
 
+### 6. Phone app: controller only, layout C keyboard (Nov 2026)
+
+The phone only ever controls the laptop, so the Android app was slimmed to that job.
+
+- `AndroidManifest.xml`: the "share this phone's screen" side is gone: screen capture service (`MainService`), accessibility input service (`InputService`), floating window, boot receiver, `rustdesk://` deep link, and their permissions (record audio, foreground services, overlay, boot, battery, notifications, camera). Left: internet, network state, wake lock. Kotlin only starts those services when Dart asks, which the xview app never does. This combination was the suspected MIUI install blocker.
+- `flutter/lib/xview/xview.dart`: on Android, `main.dart` opens `XviewHomePage` (saved Tailscale IPs, one-tap connect) instead of RustDesk's `HomePage`. It sets two defaults: touch mode on (local option `touch-mode`), laptop audio off (user default `disable_audio`).
+- `flutter/lib/xview/keyboard.dart`: the built-in split keyboard (letters, two symbol layers via 123/#+=, Fn row F1 to F12, one-shot Shift/Ctrl/Alt/Win, ^Z ^C ^V ^S ^A, hold-to-repeat), sent through `inputModel.inputKey`, plus the typed-text log.
+- `flutter/lib/xview/remote_body.dart`: landscape layout C. Side panels 23% of the width each; the middle view is 16:9 with the typed-text viewer under it. The map key (top right) paints the live picture with a teal box for what the view shows: drag the box to pan, tap for full screen, long-press to refit. The T button swaps in a trackpad (drag moves the pointer via `cursorModel.updatePan`, tap clicks, two fingers or the arrows scroll).
+- How it fits into RustDesk: `remote_page.dart` has thin hooks (`isXviewPhone`): it hides its own toolbar and floating button and builds `XviewRemoteBody`. RustDesk still draws the picture and handles touches across the whole screen; the panels sit on top and swallow touches, so the view is the hole they leave. That keeps RustDesk's coordinate maths (tap to click, pinch zoom, cursor) unchanged. The picture is fitted to the hole half a second after connecting or resizing, because RustDesk re-fits to the full screen first.
+- Known limits: the scale cannot go below RustDesk's minimum zoom (full-screen fit / 1.5), so on some phones the picture is slightly wider than the view; RustDesk's "keep the cursor visible" panning thinks the whole screen is visible, so the cursor can sit under a panel until you pan; changing the laptop's resolution needs a long-press on the map to refit; no click-and-drag on the trackpad yet (use one finger on the view instead).
+
 ## Build workflows (`.github/workflows/`)
 
 Both are trimmed copies of the matching jobs in upstream's `flutter-build.yml`, with the same pinned tool versions (Rust 1.75, Flutter 3.24.5, LLVM 15.0.6, vcpkg commit `9e593bb1`, NDK r28c). They run on every push to `xview`, and by hand from the Actions tab. Put `[skip ci]` in a commit message to skip them (useful for docs-only commits).
@@ -88,6 +99,10 @@ Both are trimmed copies of the matching jobs in upstream's `flutter-build.yml`, 
 | `xview-android.yml` | `xview-android-arm64` containing `xview-1.5.0-arm64.apk` | arm64 only. About 35 min. |
 
 The upstream workflows (`ci.yml`, `flutter-ci.yml`) only fire on pushes to `master`, which is why the work lives on the `xview` branch.
+
+Path filters: the Android build skips laptop-only changes (`flutter/windows/**`, the Windows workflow) and docs; the Windows build skips phone-only changes (`flutter/android/**`, `flutter/lib/xview/**`, the Android workflow) and docs. Changes to shared Dart such as `main.dart` start both; cancel the Windows one if the laptop doesn't need a new build.
+
+The Android workflow also has a `check-xview-dart` job: `flutter analyze` on the xview files, beside the long Rust build, so Dart errors show in about ten minutes. Each Android run's summary lists the APK size, largest files and final permissions.
 
 Last good builds:
 - Windows with icon: run `38000949221`
