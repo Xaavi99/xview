@@ -13,6 +13,12 @@ on:
   push:
     branches:
       - xview
+    # Phone-only and docs-only changes don't need a new laptop build.
+    paths-ignore:
+      - "flutter/android/**"
+      - "flutter/lib/xview/**"
+      - ".github/workflows/xview-android.yml"
+      - "**.md"
   workflow_dispatch:
 
 env:
