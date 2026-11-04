@@ -211,7 +211,7 @@ jobs:
             echo
             echo "### Largest files"
             echo '```'
-            unzip -l $apk | sort -k1 -n -r | head -12
+            unzip -l $apk | sort -k1 -n -r | sed -n 1,12p
             echo '```'
             echo "### Permissions"
             echo '```'
