@@ -107,7 +107,8 @@ The Android workflow also has a `check-xview-dart` job: `flutter analyze` on the
 
 Last good builds:
 - Windows with icon: run `38000949221`
-- Android, slim controller-only app with the layout C keyboard: run `41862261225` (commit `a525b26`). 29,209,253 bytes, SHA-256 `764fe986b5a034c32dd312e68940e99234366f45b872360c319e8e17b87ca888`, signed with the xview key. Permissions: internet, network state, wake lock only. Not yet tested on a phone.
+- Android, keyboard package + landscape default with rotate button: run `41948421154` (commit `8d39005`). Not yet tested on a phone.
+- Android, first slim controller-only app with the layout C keyboard: run `41862261225` (commit `a525b26`). 29,209,253 bytes, SHA-256 `764fe986b5a034c32dd312e68940e99234366f45b872360c319e8e17b87ca888`, signed with the xview key. Permissions: internet, network state, wake lock only. On the phone the session stayed portrait (fixed in `8d39005`).
 - Android, previous full RustDesk UI, signed with the xview key: run `38001863793`. The APK was inspected and verified with apksigner (v1 and v2), aapt and zipalign. Size 30,486,664 bytes, SHA-256 `1f039cebf78efaba80f63cc508df90642cea7a8322d9b32b144e31af844c16d7`.
 
 ### Downloading builds
