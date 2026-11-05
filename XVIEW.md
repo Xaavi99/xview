@@ -108,7 +108,8 @@ The Android workflow also has a `check-xview-dart` job: `flutter analyze` on the
 
 Last good builds:
 - Windows with icon: run `38000949221`
-- Android, full screen fixed (own fit, side strips with Keys, Touch/Mouse, Pan, zoom, Fit): run `42012479906` (commit `0caf224`). Not yet tested on a phone.
+- Android, visible pointer (own cursor layer, show-remote-cursor on): run `42022181983` (commit `5260680`). Not yet tested on a phone.
+- Android, full screen fixed (own fit, side strips with Keys, Touch/Mouse, Pan, zoom, Fit): run `42012479906` (commit `0caf224`). Tested: pointer missing in the view and full screen.
 - Android, square keys, bigger map, zoom/pan controls: run `41958298936` (commit `e53905f`). Tested: working except full screen, which was blank.
 - Android, keyboard package + landscape default with rotate button: run `41948421154` (commit `8d39005`).
 - Android, first slim controller-only app with the layout C keyboard: run `41862261225` (commit `a525b26`). 29,209,253 bytes, SHA-256 `764fe986b5a034c32dd312e68940e99234366f45b872360c319e8e17b87ca888`, signed with the xview key. Permissions: internet, network state, wake lock only. On the phone the session stayed portrait (fixed in `8d39005`).
