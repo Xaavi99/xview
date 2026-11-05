@@ -80,6 +80,11 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
   bool _pad = false;
   bool _panMode = false;
   Rect? _hole;
+  Rect? _fullRect;
+
+  /// Where the picture should sit: the middle view, or the whole screen
+  /// between the side strips in full screen.
+  Rect? get _target => _full ? _fullRect : _hole;
   Timer? _fitTimer;
 
   @override
@@ -107,10 +112,13 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
     _fitTimer = Timer(const Duration(milliseconds: 500), _fitToHole);
   }
 
+  /// Fits the whole laptop screen into the current target area. Used for
+  /// full screen too: RustDesk's own reset also re-centres on the cursor,
+  /// which could push the picture off the screen.
   void _fitToHole() {
     final img = gFFI.imageModel.image;
-    final hole = _hole;
-    if (img == null || hole == null || _full) return;
+    final hole = _target;
+    if (img == null || hole == null) return;
     final cm = gFFI.canvasModel;
     if (cm.scale <= 0) return;
     final target = min(hole.width / img.width, hole.height / img.height);
@@ -122,18 +130,17 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
   }
 
   void _zoom(double factor) {
-    final hole = _hole;
+    final hole = _target;
     if (hole == null) return;
     gFFI.canvasModel.updateScale(factor, hole.center);
   }
 
   void _setFull(bool full) {
-    setState(() => _full = full);
-    if (full) {
-      gFFI.canvasModel.reset();
-    } else {
-      _scheduleFit();
-    }
+    setState(() {
+      _full = full;
+      _panMode = false;
+    });
+    _scheduleFit();
   }
 
   /// Opaque, so touches on a panel never reach the laptop picture below.
@@ -151,16 +158,48 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
       final w = c.maxWidth;
       final h = c.maxHeight;
       if (_full) {
+        // Side strips hold the controls; the picture fits between them.
+        final bar = max(64.0, ((w - h * 16 / 9) / 2).floorToDouble());
+        final rect = Rect.fromLTWH(bar, 0, w - 2 * bar, h);
+        if (rect != _fullRect) {
+          _fullRect = rect;
+          _scheduleFit();
+        }
         return Stack(children: [
           remote,
+          if (_panMode)
+            Positioned.fromRect(
+                rect: rect, child: _PanZoomLayer(origin: rect.topLeft)),
           Positioned(
-            left: 8,
-            top: h / 2 - 30,
-            child: _RoundButton(
-              icon: Icons.keyboard,
-              label: 'Keys',
-              onTap: () => _setFull(false),
-            ),
+            left: 0,
+            top: 0,
+            width: bar,
+            height: h,
+            child: _panel(_fullStrip([
+              _stripKey(Icons.keyboard, 'Keys', false, () => _setFull(false)),
+              _stripKey(
+                  gFFI.ffiModel.touchMode ? Icons.touch_app : Icons.mouse,
+                  gFFI.ffiModel.touchMode ? 'Touch' : 'Mouse',
+                  !gFFI.ffiModel.touchMode, () {
+                gFFI.ffiModel.toggleTouchMode();
+                setState(() {});
+              }),
+              _stripKey(Icons.open_with, 'Pan', _panMode,
+                  () => setState(() => _panMode = !_panMode)),
+            ])),
+          ),
+          Positioned(
+            left: w - bar,
+            top: 0,
+            width: bar,
+            height: h,
+            child: _panel(_fullStrip([
+              _stripKey(Icons.zoom_in, 'Zoom in', false, () => _zoom(1.1),
+                  repeat: true),
+              _stripKey(Icons.zoom_out, 'Zoom out', false, () => _zoom(0.9),
+                  repeat: true),
+              _stripKey(Icons.fit_screen, 'Fit', false, _fitToHole),
+            ])),
           ),
         ]);
       }
@@ -201,6 +240,29 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
       ]);
     });
   }
+
+  Widget _fullStrip(List<Widget> keys) => Padding(
+        padding: const EdgeInsets.all(6),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (final k in keys)
+              Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: SizedBox(height: 60, child: k)),
+          ],
+        ),
+      );
+
+  Widget _stripKey(IconData icon, String label, bool active, VoidCallback onTap,
+          {bool repeat = false}) =>
+      XKey(
+          icon: icon,
+          label: label,
+          active: active,
+          repeat: repeat,
+          color: kXviewKeyDark,
+          onPress: onTap);
 
   Widget _leftHalf() => Padding(
         padding: const EdgeInsets.fromLTRB(4, 4, 2, 6),
@@ -627,38 +689,6 @@ class _SmallButton extends StatelessWidget {
                               fontWeight: FontWeight.w700)),
                 ),
               ),
-            ),
-          ),
-        ),
-      );
-}
-
-class _RoundButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  const _RoundButton(
-      {required this.icon, required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => Material(
-        color: kXviewKey,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: kXviewTealLight)),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: SizedBox(
-            width: 60,
-            height: 60,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: kXviewText, size: 22),
-                Text(label,
-                    style: const TextStyle(color: kXviewText, fontSize: 10)),
-              ],
             ),
           ),
         ),
