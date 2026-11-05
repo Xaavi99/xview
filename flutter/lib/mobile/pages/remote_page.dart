@@ -461,7 +461,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
           floatingActionButtonLocation: keyboardIsVisible
               ? FABLocation(FloatingActionButtonLocation.endFloat, 0, -35)
               : null,
-          floatingActionButton: isXviewPhone || !showActionButton
+          floatingActionButton: _xviewLandscape || !showActionButton
               ? null
               : FloatingActionButton(
                   mini: !keyboardIsVisible,
@@ -496,7 +496,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                           gFFI.ffiModel.tryShowAndroidActionsOverlay();
                           return Offstage();
                         }(),
-                  isXviewPhone ? Offstage() : _bottomWidget(),
+                  _xviewLandscape ? Offstage() : _bottomWidget(),
                   gFFI.ffiModel.pi.isSet.isFalse
                       ? emptyOverlay(MyTheme.canvasColor)
                       : Offstage(),
@@ -521,7 +521,8 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                                   gFFI.canvasModel.updateViewStyle();
                                 });
                               }
-                              if (isXviewPhone) {
+                              if (isXviewPhone &&
+                                  orientation == Orientation.landscape) {
                                 return Container(
                                     color: MyTheme.canvasColor,
                                     child: _xviewBody());
@@ -727,8 +728,13 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
         }()));
   }
 
-  // xview: the layout C screen, reusing RustDesk's picture, cursor and the
-  // hidden field the phone's own keyboard types into.
+  // xview: the layout C screen when the phone is sideways, reusing RustDesk's
+  // picture, cursor and the hidden field the phone's own keyboard types into.
+  // Upright, RustDesk's own screen and the phone keyboard are used.
+  bool get _xviewLandscape =>
+      isXviewPhone &&
+      MediaQuery.of(context).orientation == Orientation.landscape;
+
   Widget _xviewBody() => XviewRemoteBody(
         id: widget.id,
         canvas: Stack(children: [

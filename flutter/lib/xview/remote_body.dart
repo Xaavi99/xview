@@ -16,7 +16,6 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../common.dart';
 import '../common/widgets/dialog.dart';
@@ -49,8 +48,11 @@ class XviewRemoteBody extends StatefulWidget {
   State<XviewRemoteBody> createState() => _XviewRemoteBodyState();
 }
 
+// Shared, so the typed text and Shift/Ctrl state survive turning the phone
+// (RustDesk rebuilds this part of the screen on rotation and on connect).
+final _keys = XviewKeys();
+
 class _XviewRemoteBodyState extends State<XviewRemoteBody> {
-  final _keys = XviewKeys();
   bool _full = false;
   bool _pad = false;
   Rect? _hole;
@@ -59,8 +61,6 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
   @override
   void initState() {
     super.initState();
-    SystemChrome.setPreferredOrientations(
-        [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     _keys.addListener(_rebuild);
     gFFI.imageModel.addCallbackOnFirstImage((_) => _scheduleFit());
   }
@@ -69,7 +69,6 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
   void dispose() {
     _fitTimer?.cancel();
     _keys.removeListener(_rebuild);
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
   }
 

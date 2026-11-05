@@ -6,7 +6,6 @@
 // from RustDesk: connect(), the password dialog, the remote session.
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../common.dart';
 import '../consts.dart';
@@ -53,7 +52,6 @@ class _XviewHomePageState extends State<XviewHomePage> {
     _applyXviewDefaults();
     _saved = _loadSaved();
     if (_saved.isNotEmpty) _controller.text = _saved.first;
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   }
 
   @override
