@@ -17,6 +17,7 @@ on:
     paths-ignore:
       - "flutter/android/**"
       - "flutter/lib/xview/**"
+      - "flutter/xview_keyboard/**"
       - ".github/workflows/xview-android.yml"
       - "**.md"
   workflow_dispatch:

@@ -95,6 +95,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    if (isXviewPhone) xviewSessionStart();
     gFFI.ffiModel.updateEventListener(sessionId, widget.id);
     gFFI.start(
       widget.id,
@@ -144,6 +145,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
 
   @override
   Future<void> dispose() async {
+    if (isXviewPhone) xviewSessionEnd();
     WidgetsBinding.instance.removeObserver(this);
     // Close the session up-front. `gFFI.close()` below only calls `sessionClose`
     // after several awaits (canvas save, image update, the `enable_soft_keyboard`
@@ -527,7 +529,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                                     color: MyTheme.canvasColor,
                                     child: _xviewBody());
                               }
-                              return Container(
+                              return xviewPortraitWrap(Container(
                                 color: MyTheme.canvasColor,
                                 child: inputModel.isPhysicalMouse.value
                                     ? getBodyForMobile()
@@ -535,7 +537,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                                         child: getBodyForMobile(),
                                         ffi: gFFI,
                                       ),
-                              );
+                              ));
                             }),
                           ),
                   );

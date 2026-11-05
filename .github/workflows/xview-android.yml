@@ -63,7 +63,7 @@ jobs:
         run: |
           cd flutter
           flutter pub get
-          flutter analyze --no-fatal-infos --no-fatal-warnings lib/xview lib/main.dart lib/mobile/pages/remote_page.dart
+          flutter analyze --no-fatal-infos --no-fatal-warnings xview_keyboard/lib lib/xview lib/main.dart lib/mobile/pages/remote_page.dart
 
   build-xview-android:
     needs: [generate-bridge]

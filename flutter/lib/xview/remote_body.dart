@@ -16,12 +16,14 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:xview_keyboard/xview_keyboard.dart';
 
 import '../common.dart';
 import '../common/widgets/dialog.dart';
 import '../common/widgets/remote_input.dart';
 import '../models/input_model.dart';
-import 'keyboard.dart';
+import '../models/platform_model.dart';
 import 'xview.dart';
 
 class XviewRemoteBody extends StatefulWidget {
@@ -48,9 +50,30 @@ class XviewRemoteBody extends StatefulWidget {
   State<XviewRemoteBody> createState() => _XviewRemoteBodyState();
 }
 
+/// Sends a key from the xview keyboard to the laptop.
+void _sendKey(String name, XMods m) {
+  final input = gFFI.inputModel;
+  input.ctrl = m.ctrl;
+  input.alt = m.alt;
+  input.shift = m.shift;
+  input.command = m.win;
+  input.inputKey(name);
+  input.resetModifiers();
+}
+
+Future<void> _click(MouseButtons b) => gFFI.inputModel.tap(b);
+Future<void> _wheel(int y) => gFFI.inputModel.scroll(y);
+
+Future<void> _paste() async {
+  final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text ?? '';
+  if (text.isEmpty) return;
+  bind.sessionInputString(sessionId: gFFI.sessionId, value: text);
+  _keys.log(text);
+}
+
 // Shared, so the typed text and Shift/Ctrl state survive turning the phone
 // (RustDesk rebuilds this part of the screen on rotation and on connect).
-final _keys = XviewKeys();
+final _keys = XKeyboardController(send: _sendKey);
 
 class _XviewRemoteBodyState extends State<XviewRemoteBody> {
   bool _full = false;
@@ -172,79 +195,51 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
 
   Widget _leftHalf() => Padding(
         padding: const EdgeInsets.fromLTRB(4, 4, 2, 6),
-        child: Column(children: [
-          xRow([
-            (
-              _IconOnly(
-                  icon: Icons.arrow_back,
-                  label: 'Disconnect',
-                  onTap: () => clientClose(gFFI.sessionId, gFFI)),
-              1
+        child: XKeyboardHalf(rows: xLeft, controller: _keys, slots: {
+          'back': _IconOnly(
+              icon: Icons.arrow_back,
+              label: 'Disconnect',
+              onTap: () => clientClose(gFFI.sessionId, gFFI)),
+          'title': Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Laptop',
+                    style: TextStyle(
+                        color: kXviewText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+                Text(widget.id,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: kXviewMuted,
+                        fontSize: 10,
+                        fontFamily: 'monospace')),
+              ],
             ),
-            (
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Laptop',
-                        style: TextStyle(
-                            color: kXviewText,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600)),
-                    Text(widget.id,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: kXviewMuted,
-                            fontSize: 10,
-                            fontFamily: 'monospace')),
-                  ],
-                ),
-              ),
-              3
-            ),
-            (
-              _IconOnly(
-                  icon: Icons.keyboard_alt_outlined,
-                  label: 'Phone keyboard',
-                  onTap: widget.openPhoneKeyboard),
-              1
-            ),
-            (
-              _IconOnly(
-                  icon: Icons.keyboard_arrow_down,
-                  label: 'Hide keyboard',
-                  onTap: () => _setFull(true)),
-              1
-            ),
-          ]),
-          Expanded(flex: 5, child: xviewLeftKeys(_keys)),
-        ]),
+          ),
+          'phonekb': _IconOnly(
+              icon: Icons.keyboard_alt_outlined,
+              label: 'Phone keyboard',
+              onTap: widget.openPhoneKeyboard),
+          'rotate': _IconOnly(
+              icon: Icons.screen_rotation,
+              label: 'Portrait',
+              onTap: () => xviewToggleOrientation(context)),
+        }),
       );
 
   Widget _rightHalf(Rect hole) => Padding(
         padding: const EdgeInsets.fromLTRB(2, 4, 4, 6),
-        child: Column(children: [
-          Expanded(
-            flex: 2,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(flex: 3, child: xviewRightTopKeys(_keys)),
-                Expanded(
-                  flex: 3,
-                  child: _MapKey(
-                    hole: hole,
-                    onTap: () => _setFull(true),
-                    onLongPress: _fitToHole,
-                  ),
-                ),
-              ],
-            ),
+        child: XKeyboardHalf(rows: xRight, controller: _keys, slots: {
+          'map': _MapKey(
+            hole: hole,
+            onTap: () => _setFull(true),
+            onLongPress: _fitToHole,
           ),
-          Expanded(flex: 4, child: xviewRightKeys(_keys)),
-        ]),
+        }),
       );
 
   Widget _bottom() => Container(
@@ -297,7 +292,7 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
                 active: _pad,
                 onTap: () => setState(() => _pad = !_pad)),
             _SmallButton(
-                icon: Icons.content_paste, tooltip: 'Paste', onTap: _keys.paste),
+                icon: Icons.content_paste, tooltip: 'Paste', onTap: _paste),
             _SmallButton(
                 icon: Icons.close, tooltip: 'Clear', onTap: _keys.clearLog),
           ]),
@@ -432,17 +427,17 @@ class _TrackpadState extends State<_Trackpad> {
             Expanded(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => xviewClick(MouseButtons.left),
+                onTap: () => _click(MouseButtons.left),
                 onScaleStart: (_) => _scroll = 0,
                 onScaleUpdate: (d) {
                   if (d.pointerCount >= 2) {
                     _scroll += d.focalPointDelta.dy;
                     while (_scroll > 14) {
-                      xviewWheel(1);
+                      _wheel(1);
                       _scroll -= 14;
                     }
                     while (_scroll < -14) {
-                      xviewWheel(-1);
+                      _wheel(-1);
                       _scroll += 14;
                     }
                   } else {
@@ -476,14 +471,14 @@ class _TrackpadState extends State<_Trackpad> {
                         label: 'Scroll up',
                         repeat: true,
                         color: kXviewKeyDark,
-                        onPress: () => xviewWheel(1))),
+                        onPress: () => _wheel(1))),
                 Expanded(
                     child: XKey(
                         icon: Icons.keyboard_arrow_down,
                         label: 'Scroll down',
                         repeat: true,
                         color: kXviewKeyDark,
-                        onPress: () => xviewWheel(-1))),
+                        onPress: () => _wheel(-1))),
               ]),
             ),
           ],
@@ -497,13 +492,13 @@ class _TrackpadState extends State<_Trackpad> {
                   label: 'Left click',
                   color: kXviewKeyDark,
                   fontSize: 11,
-                  onPress: () => xviewClick(MouseButtons.left))),
+                  onPress: () => _click(MouseButtons.left))),
           Expanded(
               child: XKey(
                   label: 'Right click',
                   color: kXviewKeyDark,
                   fontSize: 11,
-                  onPress: () => xviewClick(MouseButtons.right))),
+                  onPress: () => _click(MouseButtons.right))),
           const SizedBox(width: 52),
         ]),
       ),

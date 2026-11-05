@@ -24,6 +24,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  xview_keyboard:
+    path: xview_keyboard
   flutter_localizations:
     sdk: flutter
 

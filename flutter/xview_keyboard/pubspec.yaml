@@ -1,0 +1,11 @@
+name: xview_keyboard
+description: The xview phone keyboard (layout C). Pure Flutter, no RustDesk code.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: '^3.1.0'
+
+dependencies:
+  flutter:
+    sdk: flutter

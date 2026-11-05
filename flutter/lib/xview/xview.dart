@@ -6,6 +6,8 @@
 // from RustDesk: connect(), the password dialog, the remote session.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:xview_keyboard/xview_keyboard.dart';
 
 import '../common.dart';
 import '../consts.dart';
@@ -17,14 +19,45 @@ bool get isXviewPhone => isAndroid;
 const _kSavedLaptops = 'xview-laptops';
 const _kMaxSaved = 5;
 
-const kXviewTeal = Color(0xFF0F766E);
-const kXviewTealLight = Color(0xFF2DD4BF);
-const kXviewBg = Color(0xFF0A0F10);
-const kXviewPanel = Color(0xFF111A1C);
-const kXviewKey = Color(0xFF1F2A2D);
-const kXviewKeyDark = Color(0xFF2C3B3F);
-const kXviewText = Color(0xFFECF3F2);
-const kXviewMuted = Color(0xFF8FA3A1);
+
+/// Sessions start sideways (layout C). Called when the remote page opens.
+void xviewSessionStart() => SystemChrome.setPreferredOrientations(
+    [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+
+/// Back to the phone's normal rotation when the session closes.
+void xviewSessionEnd() => SystemChrome.setPreferredOrientations([]);
+
+/// The rotate button: sideways (layout C) <-> upright (RustDesk's screen).
+void xviewToggleOrientation(BuildContext context) {
+  final sideways =
+      MediaQuery.of(context).orientation == Orientation.landscape;
+  SystemChrome.setPreferredOrientations(sideways
+      ? [DeviceOrientation.portraitUp]
+      : [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+}
+
+/// Upright, RustDesk's own screen gets a small button to go back sideways.
+Widget xviewPortraitWrap(Widget child) {
+  if (!isXviewPhone) return child;
+  return Stack(fit: StackFit.expand, children: [
+    child,
+    Positioned(
+      top: 8,
+      left: 8,
+      child: Builder(
+        builder: (context) => Material(
+          color: const Color(0xCC1F2A2D),
+          shape: const CircleBorder(),
+          child: IconButton(
+            tooltip: 'Landscape keyboard',
+            icon: const Icon(Icons.screen_rotation, color: kXviewTealLight),
+            onPressed: () => xviewToggleOrientation(context),
+          ),
+        ),
+      ),
+    ),
+  ]);
+}
 
 /// Defaults for every session from this phone.
 Future<void> _applyXviewDefaults() async {
