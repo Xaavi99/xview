@@ -116,40 +116,70 @@ class XKeyboardHalf extends StatelessWidget {
     this.slots = const {},
   }) : super(key: key);
 
+  static bool _grows(Object r) =>
+      r is String &&
+      r.trim().split(RegExp(r'\s+')).every((t) => t.startsWith('@'));
+
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
         animation: controller,
-        builder: (context, _) => Column(children: [
-          for (final r in rows)
-            if (r is XBlock)
-              Expanded(
-                flex: r.rows.length,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      flex: 6 - r.slotCols,
-                      child: Column(children: [
-                        for (final line in r.rows) _row(line),
-                      ]),
+        builder: (context, _) => LayoutBuilder(builder: (context, c) {
+          // Key rows are square-ish; rows of slots share what is left.
+          var fixed = 0, grow = 0;
+          for (final r in rows) {
+            if (r is XBlock) {
+              fixed += r.rows.length;
+            } else if (_grows(r)) {
+              grow++;
+            } else {
+              fixed++;
+            }
+          }
+          final keyH = c.maxWidth / 6 * xKeyHeight;
+          final spare = c.maxHeight - fixed * keyH;
+          final fits = spare >= grow * keyH * 0.8;
+          final unitH = (fits ? keyH : c.maxHeight / (fixed + grow))
+              .floorToDouble();
+          final growH = grow == 0
+              ? 0.0
+              : ((fits ? spare : unitH * grow) / grow).floorToDouble();
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              for (final r in rows)
+                if (r is XBlock)
+                  SizedBox(
+                    height: unitH * r.rows.length,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          flex: 6 - r.slotCols,
+                          child: Column(children: [
+                            for (final line in r.rows)
+                              Expanded(child: _row(line)),
+                          ]),
+                        ),
+                        Expanded(flex: r.slotCols, child: _slot(r.slot)),
+                      ],
                     ),
-                    Expanded(flex: r.slotCols, child: _slot(r.slot)),
-                  ],
-                ),
-              )
-            else
-              _row(r as String),
-        ]),
+                  )
+                else
+                  SizedBox(
+                    height: _grows(r) ? growH : unitH,
+                    child: _row(r as String),
+                  ),
+            ],
+          );
+        }),
       );
 
-  Widget _row(String line) => Expanded(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final (token, span) in _tokens(line))
-              Expanded(flex: span, child: _key(token)),
-          ],
-        ),
+  Widget _row(String line) => Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (token, span) in _tokens(line))
+            Expanded(flex: span, child: _key(token)),
+        ],
       );
 
   /// Splits a row into (token, width) pairs, expanding $0..$5.

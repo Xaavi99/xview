@@ -14,10 +14,14 @@
 //   Layer                  letters -> symbols -> more symbols -> letters
 //   ^A .. ^Z               Ctrl + that letter
 //   @name                  a slot the app fills in: @back @title @phonekb
-//                          @rotate @map
+//                          @rotate @map @zoomout @zoomin @fit @pan @full
+//
+// Key rows are square (see xKeyHeight). A row made only of @slots stretches
+// to share whatever height is left over, so the map and the header grow
+// instead of the keys.
 //
 // XBlock(rows, slot) puts a slot beside some rows and makes it as tall as
-// all of them (the map key is 3 columns wide and 2 rows tall).
+// all of them.
 
 import 'package:flutter/painting.dart';
 
@@ -30,8 +34,16 @@ class XBlock {
   const XBlock(this.rows, {required this.slot, this.slotCols = 3});
 }
 
+/// How much of the screen width each keyboard half takes (0.30 = 30%).
+/// The laptop view in the middle gets the rest.
+const xSideWidth = 0.30;
+
+/// Key height divided by key width. 1.0 makes square keys.
+const xKeyHeight = 1.0;
+
 const xLeft = <Object>[
   '@back @title:3 @phonekb @rotate',
+  '@zoomout @zoomin @fit @pan:2 @full',
   'Fn Win PgUp PgDn ^S ^A',
   r'Esc $0',
   r'Tab $1',
@@ -40,7 +52,8 @@ const xLeft = <Object>[
 ];
 
 const xRight = <Object>[
-  XBlock(['^Z ^C ^V', 'Del Home End'], slot: '@map'),
+  '@map:6',
+  '^Z ^C ^V Del Home End',
   r'$3 Bksp',
   r'$4 Enter:2',
   r'$5 Up /',

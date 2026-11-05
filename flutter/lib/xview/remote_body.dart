@@ -78,6 +78,7 @@ final _keys = XKeyboardController(send: _sendKey);
 class _XviewRemoteBodyState extends State<XviewRemoteBody> {
   bool _full = false;
   bool _pad = false;
+  bool _panMode = false;
   Rect? _hole;
   Timer? _fitTimer;
 
@@ -120,6 +121,12 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
     cm.panY(hole.top + max(0.0, (hole.height - h) / 2) - cm.y);
   }
 
+  void _zoom(double factor) {
+    final hole = _hole;
+    if (hole == null) return;
+    gFFI.canvasModel.updateScale(factor, hole.center);
+  }
+
   void _setFull(bool full) {
     setState(() => _full = full);
     if (full) {
@@ -157,7 +164,7 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
           ),
         ]);
       }
-      final side = (w * 0.23).floorToDouble();
+      final side = (w * xSideWidth).floorToDouble();
       final mid = w - 2 * side;
       final viewH = min(mid * 9 / 16, h * 0.72).floorToDouble();
       final hole = Rect.fromLTWH(side, 0, mid, viewH);
@@ -167,6 +174,8 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
       }
       return Stack(children: [
         remote,
+        if (_panMode)
+          Positioned.fromRect(rect: hole, child: _PanZoomLayer(origin: hole.topLeft)),
         Positioned(
           left: 0,
           top: 0,
@@ -228,6 +237,31 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
               icon: Icons.screen_rotation,
               label: 'Portrait',
               onTap: () => xviewToggleOrientation(context)),
+          'zoomout': XKey(
+              icon: Icons.zoom_out,
+              label: 'Zoom out',
+              repeat: true,
+              color: kXviewKeyDark,
+              onPress: () => _zoom(0.9)),
+          'zoomin': XKey(
+              icon: Icons.zoom_in,
+              label: 'Zoom in',
+              repeat: true,
+              color: kXviewKeyDark,
+              onPress: () => _zoom(1.1)),
+          'fit': XKey(
+              label: 'Fit', color: kXviewKeyDark, onPress: _fitToHole),
+          'pan': XKey(
+              icon: Icons.open_with,
+              label: 'Pan',
+              active: _panMode,
+              color: kXviewKeyDark,
+              onPress: () => setState(() => _panMode = !_panMode)),
+          'full': XKey(
+              icon: Icons.fullscreen,
+              label: 'Full screen',
+              color: kXviewKeyDark,
+              onPress: () => _setFull(true)),
         }),
       );
 
@@ -403,6 +437,39 @@ class _MapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+/// Pan mode: covers the view so one finger moves the picture and a pinch
+/// zooms it, instead of clicking on the laptop.
+class _PanZoomLayer extends StatefulWidget {
+  final Offset origin;
+  const _PanZoomLayer({required this.origin});
+
+  @override
+  State<_PanZoomLayer> createState() => _PanZoomLayerState();
+}
+
+class _PanZoomLayerState extends State<_PanZoomLayer> {
+  double _last = 1;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onScaleStart: (_) => _last = 1,
+        onScaleUpdate: (d) {
+          final cm = gFFI.canvasModel;
+          if (d.scale != _last && _last > 0) {
+            cm.updateScale(d.scale / _last, widget.origin + d.localFocalPoint);
+            _last = d.scale;
+          }
+          cm.panX(d.focalPointDelta.dx);
+          cm.panY(d.focalPointDelta.dy);
+        },
+        child: Container(
+          decoration: BoxDecoration(
+              border: Border.all(color: kXviewTealLight, width: 2)),
+        ),
+      );
 }
 
 /// Trackpad: drag to move the pointer, tap to click, two fingers or the
