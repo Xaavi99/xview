@@ -29,7 +29,8 @@ import 'xview.dart';
 class XviewRemoteBody extends StatefulWidget {
   final String id;
 
-  /// RustDesk's picture of the laptop (image and cursor), full screen.
+  /// RustDesk's picture of the laptop, full screen. The pointer is drawn
+  /// here instead (see _CursorLayer).
   final Widget canvas;
 
   /// Opens the phone's own keyboard (Honor, Gboard...), RustDesk's way.
@@ -91,7 +92,10 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
   void initState() {
     super.initState();
     _keys.addListener(_rebuild);
-    gFFI.imageModel.addCallbackOnFirstImage((_) => _scheduleFit());
+    gFFI.imageModel.addCallbackOnFirstImage((_) {
+      _scheduleFit();
+      _showRemoteCursor();
+    });
   }
 
   @override
@@ -99,6 +103,16 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
     _fitTimer?.cancel();
     _keys.removeListener(_rebuild);
     super.dispose();
+  }
+
+  /// Ask the laptop to send where its pointer really is. Without this it only
+  /// sends the pointer's shape and the phone guesses the position.
+  void _showRemoteCursor() {
+    const opt = 'show-remote-cursor';
+    final sid = gFFI.sessionId;
+    if (!bind.sessionGetToggleOptionSync(sessionId: sid, arg: opt)) {
+      bind.sessionToggleOption(sessionId: sid, value: opt);
+    }
   }
 
   void _rebuild() {
@@ -167,6 +181,7 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
         }
         return Stack(children: [
           remote,
+          const Positioned.fill(child: _CursorLayer()),
           if (_panMode)
             Positioned.fromRect(
                 rect: rect, child: _PanZoomLayer(origin: rect.topLeft)),
@@ -213,6 +228,7 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
       }
       return Stack(children: [
         remote,
+        const Positioned.fill(child: _CursorLayer()),
         if (_panMode)
           Positioned.fromRect(rect: hole, child: _PanZoomLayer(origin: hole.topLeft)),
         Positioned(
@@ -495,6 +511,66 @@ class _MapPainter extends CustomPainter {
           ..color = kXviewTealLight
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+/// The laptop's pointer, drawn big enough to see on a phone. RustDesk draws
+/// it at the picture's scale (12 px minimum), which is a speck once the
+/// laptop screen is shrunk to fit. Touches pass straight through.
+class _CursorLayer extends StatelessWidget {
+  const _CursorLayer();
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+        child: AnimatedBuilder(
+          animation: Listenable.merge([gFFI.cursorModel, gFFI.canvasModel]),
+          builder: (_, __) => CustomPaint(painter: _CursorPainter()),
+        ),
+      );
+}
+
+class _CursorPainter extends CustomPainter {
+  static const _minSize = 22.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cm = gFFI.canvasModel;
+    final m = gFFI.cursorModel;
+    if (cm.scale <= 0 || gFFI.imageModel.image == null) return;
+    final px = cm.x + m.x * cm.scale;
+    final py = cm.y + m.y * cm.scale;
+    final img = m.image;
+    if (img != null && img.width > 0 && img.height > 0) {
+      final k = max(cm.scale, _minSize / max(img.width, img.height));
+      canvas.drawImageRect(
+        img,
+        Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
+        Rect.fromLTWH(px - m.hotx * k, py - m.hoty * k, img.width * k,
+            img.height * k),
+        Paint()..filterQuality = FilterQuality.medium,
+      );
+      return;
+    }
+    // No shape from the laptop yet: a plain arrow with its tip at the pointer.
+    final arrow = Path()
+      ..moveTo(px, py)
+      ..lineTo(px, py + 20)
+      ..lineTo(px + 5, py + 15.5)
+      ..lineTo(px + 8.5, py + 23)
+      ..lineTo(px + 12, py + 21.5)
+      ..lineTo(px + 8.5, py + 14)
+      ..lineTo(px + 14.5, py + 14)
+      ..close();
+    canvas.drawPath(arrow, Paint()..color = Colors.white);
+    canvas.drawPath(
+        arrow,
+        Paint()
+          ..color = Colors.black
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5);
   }
 
   @override

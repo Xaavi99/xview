@@ -739,10 +739,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
 
   Widget _xviewBody() => XviewRemoteBody(
         id: widget.id,
-        canvas: Stack(children: [
-          ImagePaint(ffiModel: gFFI.ffiModel),
-          if (showCursorPaint) CursorPaint(widget.id),
-        ]),
+        canvas: ImagePaint(ffiModel: gFFI.ffiModel),
         openPhoneKeyboard: openKeyboard,
         phoneKeyboardField: SizedBox(
           width: 0,

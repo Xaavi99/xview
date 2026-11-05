@@ -66,6 +66,8 @@ Future<void> _applyXviewDefaults() async {
   await bind.mainSetLocalOption(key: kOptionTouchMode, value: 'Y');
   // No laptop sound on the phone: saves data and battery.
   await bind.mainSetUserDefaultOption(key: kOptionDisableAudio, value: 'Y');
+  // The laptop sends where its pointer really is, so the phone can show it.
+  await bind.mainSetUserDefaultOption(key: kOptionShowRemoteCursor, value: 'Y');
 }
 
 class XviewHomePage extends StatefulWidget {
