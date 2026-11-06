@@ -11,6 +11,7 @@ import 'package:xview_keyboard/xview_keyboard.dart';
 
 import '../common.dart';
 import '../consts.dart';
+import '../models/input_model.dart';
 import '../models/platform_model.dart';
 
 /// The xview phone layout replaces RustDesk's mobile UI on Android.
@@ -24,8 +25,24 @@ const _kMaxSaved = 5;
 void xviewSessionStart() => SystemChrome.setPreferredOrientations(
     [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
 
-/// Back to the phone's normal rotation when the session closes.
-void xviewSessionEnd() => SystemChrome.setPreferredOrientations([]);
+/// Back to the phone's normal rotation when the session closes, and never
+/// leave the laptop's mouse button stuck down.
+void xviewSessionEnd() {
+  if (xviewMouseHeld.value) xviewHoldMouse(false);
+  SystemChrome.setPreferredOrientations([]);
+}
+
+/// Whether the laptop's left mouse button is being held down (Hold button
+/// or tap-then-drag), for dragging things like a VS Code panel edge.
+final xviewMouseHeld = ValueNotifier<bool>(false);
+
+void xviewHoldMouse(bool down) {
+  if (xviewMouseHeld.value == down) return;
+  xviewMouseHeld.value = down;
+  down
+      ? gFFI.inputModel.tapDown(MouseButtons.left)
+      : gFFI.inputModel.tapUp(MouseButtons.left);
+}
 
 /// The rotate button: sideways (layout C) <-> upright (RustDesk's screen).
 void xviewToggleOrientation(BuildContext context) {

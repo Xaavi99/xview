@@ -20,7 +20,7 @@ const xLeft = <Object>[
 - `:N` makes a key N columns wide (each half has 6).
 - `$0`..`$5` are the character rows in `xLayers` (letters, symbols, more).
 - `@name` is a slot the app fills: `@back`, `@title`, `@phonekb`, `@rotate`,
-  `@map`, `@zoomout`, `@zoomin`, `@fit`, `@pan`, `@full`. A row made only of
+  `@map`, `@zoomout`, `@zoomin`, `@fit`, `@pan`, `@hold`, `@full`. A row made only of
   slots stretches to use the spare height; key rows stay square.
 - `xSideWidth` sets how wide each half is; `xKeyHeight` sets the key shape
   (1.0 = square).

@@ -14,7 +14,8 @@
 //   Layer                  letters -> symbols -> more symbols -> letters
 //   ^A .. ^Z               Ctrl + that letter
 //   @name                  a slot the app fills in: @back @title @phonekb
-//                          @rotate @map @zoomout @zoomin @fit @pan @full
+//                          @rotate @map @zoomout @zoomin @fit @pan @hold
+//                          @full
 //
 // Key rows are square (see xKeyHeight). A row made only of @slots stretches
 // to share whatever height is left over, so the map and the header grow
@@ -43,7 +44,7 @@ const xKeyHeight = 1.0;
 
 const xLeft = <Object>[
   '@back @title:3 @phonekb @rotate',
-  '@zoomout @zoomin @fit @pan:2 @full',
+  '@zoomout @zoomin @fit @pan @hold @full',
   'Fn Win PgUp PgDn ^S ^A',
   r'Esc $0',
   r'Tab $1',

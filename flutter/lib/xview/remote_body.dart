@@ -199,6 +199,7 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
                 gFFI.ffiModel.toggleTouchMode();
                 setState(() {});
               }),
+              const _HoldKey(),
               _stripKey(Icons.open_with, 'Pan', _panMode,
                   () => setState(() => _panMode = !_panMode)),
             ])),
@@ -335,6 +336,7 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
               active: _panMode,
               color: kXviewKeyDark,
               onPress: () => setState(() => _panMode = !_panMode)),
+          'hold': const _HoldKey(),
           'full': XKey(
               icon: Icons.fullscreen,
               label: 'Full screen',
@@ -621,6 +623,29 @@ class _Trackpad extends StatefulWidget {
 
 class _TrackpadState extends State<_Trackpad> {
   double _scroll = 0;
+  DateTime? _lastTap;
+  bool _dragging = false;
+
+  /// Tap, then put the finger straight back down and slide: that drags
+  /// (mouse button held until the finger lifts), like a laptop touchpad.
+  void _start(ScaleStartDetails d) {
+    _scroll = 0;
+    final last = _lastTap;
+    if (d.pointerCount == 1 &&
+        last != null &&
+        DateTime.now().difference(last) < const Duration(milliseconds: 350) &&
+        !xviewMouseHeld.value) {
+      _lastTap = null;
+      xviewHoldMouse(true);
+      setState(() => _dragging = true);
+    }
+  }
+
+  void _end(ScaleEndDetails _) {
+    if (!_dragging) return;
+    xviewHoldMouse(false);
+    setState(() => _dragging = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -632,8 +657,12 @@ class _TrackpadState extends State<_Trackpad> {
             Expanded(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => _click(MouseButtons.left),
-                onScaleStart: (_) => _scroll = 0,
+                onTap: () {
+                  _click(MouseButtons.left);
+                  _lastTap = DateTime.now();
+                },
+                onScaleStart: _start,
+                onScaleEnd: _end,
                 onScaleUpdate: (d) {
                   if (d.pointerCount >= 2) {
                     _scroll += d.focalPointDelta.dy;
@@ -654,14 +683,18 @@ class _TrackpadState extends State<_Trackpad> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF16272A),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: kXviewKeyDark),
+                    border: Border.all(
+                        color: _dragging ? kXviewTealLight : kXviewKeyDark,
+                        width: _dragging ? 2 : 1),
                   ),
                   alignment: Alignment.center,
-                  child: const Text(
-                    'Trackpad\ndrag to move · tap to click\ntwo fingers to scroll',
+                  child: Text(
+                    _dragging
+                        ? 'Dragging · lift to drop'
+                        : 'Trackpad\ndrag to move · tap to click\ntap then drag to drag\ntwo fingers to scroll',
                     textAlign: TextAlign.center,
-                    style:
-                        TextStyle(color: kXviewMuted, fontSize: 10, height: 1.4),
+                    style: const TextStyle(
+                        color: kXviewMuted, fontSize: 10, height: 1.4),
                   ),
                 ),
               ),
@@ -704,11 +737,30 @@ class _TrackpadState extends State<_Trackpad> {
                   color: kXviewKeyDark,
                   fontSize: 11,
                   onPress: () => _click(MouseButtons.right))),
-          const SizedBox(width: 52),
+          const SizedBox(width: 52, child: _HoldKey()),
         ]),
       ),
     ]);
   }
+}
+
+/// Hold: press the laptop's left mouse button and keep it down until tapped
+/// again. Move the pointer in between (trackpad, or Mouse mode) to drag,
+/// e.g. a VS Code panel edge.
+class _HoldKey extends StatelessWidget {
+  const _HoldKey();
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<bool>(
+        valueListenable: xviewMouseHeld,
+        builder: (_, held, __) => XKey(
+          icon: Icons.pan_tool_alt_outlined,
+          label: held ? 'Release mouse button' : 'Hold mouse button',
+          active: held,
+          color: kXviewKeyDark,
+          onPress: () => xviewHoldMouse(!held),
+        ),
+      );
 }
 
 class _IconOnly extends StatelessWidget {
