@@ -202,6 +202,12 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
               const _HoldKey(),
               _stripKey(Icons.open_with, 'Pan', _panMode,
                   () => setState(() => _panMode = !_panMode)),
+              XKey(
+                  label: 'Tab',
+                  color: kXviewTealDark,
+                  textColor: Colors.white,
+                  fontSize: 14,
+                  onPress: () => _keys.tap('Tab')),
             ])),
           ),
           Positioned(
@@ -215,6 +221,12 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
               _stripKey(Icons.zoom_out, 'Zoom out', false, () => _zoom(0.9),
                   repeat: true),
               _stripKey(Icons.fit_screen, 'Fit', false, _fitToHole),
+              XKey(
+                  icon: Icons.keyboard_return,
+                  label: 'Enter',
+                  color: kXviewTeal,
+                  textColor: Colors.white,
+                  onPress: () => _keys.tap('Enter')),
             ])),
           ),
         ]);
