@@ -29,6 +29,12 @@ const xLeft = <Object>[
 Moving a key is a one-line change there, and nothing else in the app needs to
 change. Push it to the `xview` branch and the Android build picks it up.
 
+## Tablet keyboard
+
+`xTablet` in the same file is the full keyboard used on tablets (15 columns,
+`xTabletColumns`). It is edited the same way. `xShiftMap` says what Shift
+turns each symbol key into (1 to !, and so on).
+
 ## What else is here
 
 - `lib/src/controller.dart`: modifiers, layers, Fn, the typed-text log, and

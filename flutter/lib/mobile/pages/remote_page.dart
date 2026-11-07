@@ -524,7 +524,8 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                                 });
                               }
                               if (isXviewPhone &&
-                                  orientation == Orientation.landscape) {
+                                  (orientation == Orientation.landscape ||
+                                      xviewIsTablet)) {
                                 return Container(
                                     color: MyTheme.canvasColor,
                                     child: _xviewBody());
@@ -735,7 +736,8 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
   // Upright, RustDesk's own screen and the phone keyboard are used.
   bool get _xviewLandscape =>
       isXviewPhone &&
-      MediaQuery.of(context).orientation == Orientation.landscape;
+      (MediaQuery.of(context).orientation == Orientation.landscape ||
+          xviewIsTablet);
 
   Widget _xviewBody() => XviewRemoteBody(
         id: widget.id,

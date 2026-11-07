@@ -21,9 +21,24 @@ const _kSavedLaptops = 'xview-laptops';
 const _kMaxSaved = 5;
 
 
-/// Sessions start sideways (layout C). Called when the remote page opens.
-void xviewSessionStart() => SystemChrome.setPreferredOrientations(
-    [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+const _kLayout = 'xview-layout';
+
+/// Tablet layout (one full keyboard, works both ways up) or phone layout C.
+/// "Auto" picks the tablet one when the screen is 600+ wide on its short
+/// side, which is how Android itself tells tablets from phones.
+bool get xviewIsTablet {
+  final pref = bind.mainGetLocalOption(key: _kLayout);
+  if (pref == 'phone') return false;
+  if (pref == 'tablet') return true;
+  final view = WidgetsBinding.instance.platformDispatcher.views.first;
+  return (view.physicalSize / view.devicePixelRatio).shortestSide >= 600;
+}
+
+/// Phones start sideways (layout C); tablets follow the tablet's rotation.
+/// Called when the remote page opens.
+void xviewSessionStart() => SystemChrome.setPreferredOrientations(xviewIsTablet
+    ? []
+    : [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
 
 /// Back to the phone's normal rotation when the session closes, and never
 /// leave the laptop's mouse button stuck down.
@@ -97,12 +112,15 @@ class XviewHomePage extends StatefulWidget {
 class _XviewHomePageState extends State<XviewHomePage> {
   final _controller = TextEditingController();
   List<String> _saved = [];
+  String _layout = 'auto';
 
   @override
   void initState() {
     super.initState();
     _applyXviewDefaults();
     _saved = _loadSaved();
+    final l = bind.mainGetLocalOption(key: _kLayout);
+    if (l == 'phone' || l == 'tablet') _layout = l;
     if (_saved.isNotEmpty) _controller.text = _saved.first;
   }
 
@@ -223,6 +241,30 @@ class _XviewHomePageState extends State<XviewHomePage> {
                     ),
                   )),
             ],
+            const SizedBox(height: 28),
+            const Text('Layout',
+                style: TextStyle(color: kXviewMuted, fontSize: 13)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 8, children: [
+              for (final (value, label) in const [
+                ('auto', 'Auto'),
+                ('phone', 'Phone (split keyboard)'),
+                ('tablet', 'Tablet (full keyboard)'),
+              ])
+                ChoiceChip(
+                  label: Text(label),
+                  selected: _layout == value,
+                  selectedColor: kXviewTeal,
+                  labelStyle: TextStyle(
+                      color: _layout == value ? Colors.white : kXviewText),
+                  backgroundColor: kXviewKey,
+                  onSelected: (_) async {
+                    await bind.mainSetLocalOption(
+                        key: _kLayout, value: value == 'auto' ? '' : value);
+                    setState(() => _layout = value);
+                  },
+                ),
+            ]),
             const SizedBox(height: 28),
             const Text(
               'Tailscale must be on, on this phone and the laptop. '

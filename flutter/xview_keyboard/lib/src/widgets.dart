@@ -109,11 +109,15 @@ class XKeyboardHalf extends StatelessWidget {
   final XKeyboardController controller;
   final Map<String, Widget> slots;
 
+  /// Grid columns: 6 for a phone half, 15 for the tablet keyboard.
+  final int columns;
+
   const XKeyboardHalf({
     Key? key,
     required this.rows,
     required this.controller,
     this.slots = const {},
+    this.columns = 6,
   }) : super(key: key);
 
   static bool _grows(Object r) =>
@@ -135,7 +139,7 @@ class XKeyboardHalf extends StatelessWidget {
               fixed++;
             }
           }
-          final keyH = c.maxWidth / 6 * xKeyHeight;
+          final keyH = c.maxWidth / columns * xKeyHeight;
           final spare = c.maxHeight - fixed * keyH;
           final fits = spare >= grow * keyH * 0.8;
           final unitH = (fits ? keyH : c.maxHeight / (fixed + grow))
@@ -154,7 +158,7 @@ class XKeyboardHalf extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Expanded(
-                          flex: 6 - r.slotCols,
+                          flex: columns - r.slotCols,
                           child: Column(children: [
                             for (final line in r.rows)
                               Expanded(child: _row(line)),
@@ -219,7 +223,7 @@ class XKeyboardHalf extends StatelessWidget {
     if (t.startsWith('@')) return _slot(t);
     final c = controller;
     if (t.length == 1) {
-      final shown = c.layer == 0 && c.shift ? t.toUpperCase() : t;
+      final shown = c.shift ? (xShiftMap[t] ?? t.toUpperCase()) : t;
       return XKey(label: shown, onPress: () => c.tap(t), fontSize: 19);
     }
     final named = xNamedKeys[t];

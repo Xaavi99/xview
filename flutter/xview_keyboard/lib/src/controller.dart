@@ -126,7 +126,7 @@ class XKeyboardController extends ChangeNotifier {
       log('[${ctrl ? 'Ctrl+' : ''}${alt ? 'Alt+' : ''}${win ? 'Win+' : ''}${c.toUpperCase()}]');
       return _clearMods();
     }
-    final out = shift ? c.toUpperCase() : c;
+    final out = shift ? (xShiftMap[c] ?? c.toUpperCase()) : c;
     send(out, const XMods());
     log(out);
     if (shift) _clearMods();

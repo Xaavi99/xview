@@ -219,6 +219,7 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
           ),
         ]);
       }
+      if (xviewIsTablet) return _tablet(w, h, remote);
       final side = (w * xSideWidth).floorToDouble();
       final mid = w - 2 * side;
       final viewH = min(mid * 9 / 16, h * 0.72).floorToDouble();
@@ -356,6 +357,156 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
         }),
       );
 
+  /// Tablet layout: a toolbar, the laptop view, the typed text, one full
+  /// keyboard and an always-on trackpad. Landscape puts the typed text beside
+  /// the view and the trackpad beside the keyboard; portrait stacks them.
+  Widget _tablet(double w, double h, Widget remote) {
+    const barH = 52.0;
+    final landscape = w > h;
+    final kbH = (h * (landscape ? 0.36 : 0.27)).floorToDouble();
+    final Rect hole;
+    final List<Widget> panels;
+    if (landscape) {
+      final sideW = (w * 0.2).floorToDouble();
+      hole = Rect.fromLTWH(0, barH, w - sideW, h - barH - kbH);
+      final padW = (w * 0.24).floorToDouble();
+      panels = [
+        Positioned(
+            left: hole.right,
+            top: barH,
+            width: sideW,
+            height: hole.height,
+            child: _panel(Container(
+                color: kXviewPanel,
+                padding: const EdgeInsets.all(8),
+                child: _typedViewer(compact: false, trackpadButton: false)))),
+        Positioned(
+            left: 0,
+            top: h - kbH,
+            width: w - padW,
+            height: kbH,
+            child: _panel(Padding(
+                padding: const EdgeInsets.fromLTRB(6, 4, 4, 8),
+                child: XKeyboardHalf(
+                    rows: xTablet,
+                    columns: xTabletColumns,
+                    controller: _keys)))),
+        Positioned(
+            left: w - padW,
+            top: h - kbH,
+            width: padW,
+            height: kbH,
+            child: _panel(const Padding(
+                padding: EdgeInsets.fromLTRB(4, 6, 8, 8), child: _Trackpad()))),
+      ];
+    } else {
+      final viewH = (w * 9 / 16).floorToDouble();
+      const typedH = 112.0;
+      hole = Rect.fromLTWH(0, barH, w, viewH);
+      final padTop = barH + viewH + typedH;
+      panels = [
+        Positioned(
+            left: 0,
+            top: hole.bottom,
+            width: w,
+            height: typedH,
+            child: _panel(Container(
+                color: kXviewPanel,
+                padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                child: _typedViewer(compact: true, trackpadButton: false)))),
+        Positioned(
+            left: 0,
+            top: padTop,
+            width: w,
+            height: max(0.0, h - kbH - padTop),
+            child: _panel(const Padding(
+                padding: EdgeInsets.fromLTRB(8, 6, 8, 4), child: _Trackpad()))),
+        Positioned(
+            left: 0,
+            top: h - kbH,
+            width: w,
+            height: kbH,
+            child: _panel(Padding(
+                padding: const EdgeInsets.fromLTRB(6, 4, 6, 8),
+                child: XKeyboardHalf(
+                    rows: xTablet,
+                    columns: xTabletColumns,
+                    controller: _keys)))),
+      ];
+    }
+    if (hole != _hole) {
+      _hole = hole;
+      _scheduleFit();
+    }
+    return Stack(children: [
+      remote,
+      const Positioned.fill(child: _CursorLayer()),
+      if (_panMode)
+        Positioned.fromRect(rect: hole, child: _PanZoomLayer(origin: hole.topLeft)),
+      Positioned(
+          left: 0, top: 0, width: w, height: barH, child: _panel(_tabletBar())),
+      ...panels,
+      widget.phoneKeyboardField,
+    ]);
+  }
+
+  Widget _tabletBar() {
+    Widget key(Widget k) => SizedBox(width: 60, child: k);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: Row(children: [
+        _IconOnly(
+            icon: Icons.arrow_back,
+            label: 'Disconnect',
+            onTap: () => clientClose(gFFI.sessionId, gFFI)),
+        const SizedBox(width: 6),
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Laptop',
+                style: TextStyle(
+                    color: kXviewText, fontSize: 14, fontWeight: FontWeight.w600)),
+            Text(widget.id,
+                style: const TextStyle(
+                    color: kXviewMuted, fontSize: 11, fontFamily: 'monospace')),
+          ],
+        ),
+        const Spacer(),
+        key(XKey(
+            icon: Icons.zoom_out,
+            label: 'Zoom out',
+            repeat: true,
+            color: kXviewKeyDark,
+            onPress: () => _zoom(0.9))),
+        key(XKey(
+            icon: Icons.zoom_in,
+            label: 'Zoom in',
+            repeat: true,
+            color: kXviewKeyDark,
+            onPress: () => _zoom(1.1))),
+        key(XKey(label: 'Fit', color: kXviewKeyDark, onPress: _fitToHole)),
+        key(XKey(
+            icon: Icons.open_with,
+            label: 'Pan',
+            active: _panMode,
+            color: kXviewKeyDark,
+            onPress: () => setState(() => _panMode = !_panMode))),
+        key(const _HoldKey()),
+        key(XKey(
+            icon: Icons.fullscreen,
+            label: 'Full screen',
+            color: kXviewKeyDark,
+            onPress: () => _setFull(true))),
+        key(XKey(
+            icon: Icons.keyboard_alt_outlined,
+            label: 'Phone keyboard',
+            color: kXviewKeyDark,
+            onPress: widget.openPhoneKeyboard)),
+      ]),
+    );
+  }
+
   Widget _bottom() => Container(
         color: kXviewPanel,
         padding: const EdgeInsets.all(6),
@@ -371,7 +522,7 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
         ),
       );
 
-  Widget _typedViewer({required bool compact}) {
+  Widget _typedViewer({required bool compact, bool trackpadButton = true}) {
     final lines = _keys.history.reversed.take(compact ? 2 : 4).toList().reversed;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -400,6 +551,7 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
         SizedBox(
           height: 36,
           child: Row(children: [
+            if (trackpadButton)
             _SmallButton(
                 label: 'T',
                 tooltip: 'Trackpad',

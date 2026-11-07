@@ -78,6 +78,25 @@ const xFnRows = <int, String>{
   4: 'F11 F12 Ins PrtSc',
 };
 
+/// Tablet keyboard (OnePlus Pad 2 and other screens 600+ wide on their
+/// short side): one full laptop-style keyboard, 15 columns, 6 rows.
+const xTabletColumns = 15;
+const xTablet = <Object>[
+  'Esc F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 Ins Del',
+  '` 1 2 3 4 5 6 7 8 9 0 - = Bksp:2',
+  r'Tab:2 q w e r t y u i o p [ ] ',
+  "Ctrl:2 a s d f g h j k l ; ' Enter:2",
+  'Shift:2 z x c v b n m , . / Home Up End',
+  'Win Alt ^Z Space:7 ^C ^V Left Down Right',
+];
+
+/// What Shift turns a key into (US layout). Letters just become capitals.
+const xShiftMap = <String, String>{
+  '`': '~', '1': '!', '2': '@', '3': '#', '4': r'$', '5': '%', '6': '^',
+  '7': '&', '8': '*', '9': '(', '0': ')', '-': '_', '=': '+', '[': '{',
+  ']': '}', r'': '|', ';': ':', "'": '"', ',': '<', '.': '>', '/': '?',
+};
+
 /// Key colours that differ from the defaults.
 const xKeyColors = <String, Color>{
   'Enter': kXviewTeal,
