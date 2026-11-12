@@ -29,6 +29,12 @@ const xLeft = <Object>[
 Moving a key is a one-line change there, and nothing else in the app needs to
 change. Push it to the `xview` branch and the Android build picks it up.
 
+## Full-screen strips
+
+`xFullLeft` and `xFullRight` are the keys down each side in full screen, top
+to bottom, one token per row. They take the same key names plus the slots
+`@scrollup`, `@scrolldown`, `@hold`, `@mouse`, `@more` and `@phonekb`.
+
 ## Tablet keyboard
 
 `xTablet` in the same file is the full keyboard used on tablets (15 columns,

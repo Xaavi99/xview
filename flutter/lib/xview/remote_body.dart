@@ -76,8 +76,13 @@ Future<void> _paste() async {
 // (RustDesk rebuilds this part of the screen on rotation and on connect).
 final _keys = XKeyboardController(send: _sendKey);
 
+/// Phones open in full screen and stay in whichever mode was chosen last,
+/// even when RustDesk rebuilds this part of the screen.
+bool _fullChoice = true;
+
 class _XviewRemoteBodyState extends State<XviewRemoteBody> {
-  bool _full = false;
+  bool _full = !xviewIsTablet && _fullChoice;
+  bool _more = false;
   bool _pad = false;
   bool _panMode = false;
   Rect? _hole;
@@ -150,11 +155,24 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
   }
 
   void _setFull(bool full) {
+    if (!xviewIsTablet) _fullChoice = full;
     setState(() {
       _full = full;
       _panMode = false;
+      _more = false;
     });
     _scheduleFit();
+  }
+
+  bool get _phoneKeyboardOpen => MediaQuery.of(context).viewInsets.bottom > 0;
+
+  void _togglePhoneKeyboard() {
+    if (_phoneKeyboardOpen) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      SystemChannels.textInput.invokeMethod('TextInput.hide');
+    } else {
+      widget.openPhoneKeyboard();
+    }
   }
 
   /// Opaque, so touches on a panel never reach the laptop picture below.
@@ -177,7 +195,9 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
         final rect = Rect.fromLTWH(bar, 0, w - 2 * bar, h);
         if (rect != _fullRect) {
           _fullRect = rect;
-          _scheduleFit();
+          // While the phone keyboard is open the picture keeps its zoom and
+          // RustDesk keeps the text cursor in view; refit once it closes.
+          if (!_phoneKeyboardOpen) _scheduleFit();
         }
         return Stack(children: [
           remote,
@@ -190,45 +210,22 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
             top: 0,
             width: bar,
             height: h,
-            child: _panel(_fullStrip([
-              _stripKey(Icons.keyboard, 'Keys', false, () => _setFull(false)),
-              _stripKey(
-                  gFFI.ffiModel.touchMode ? Icons.touch_app : Icons.mouse,
-                  gFFI.ffiModel.touchMode ? 'Touch' : 'Mouse',
-                  !gFFI.ffiModel.touchMode, () {
-                gFFI.ffiModel.toggleTouchMode();
-                setState(() {});
-              }),
-              const _HoldKey(),
-              _stripKey(Icons.open_with, 'Pan', _panMode,
-                  () => setState(() => _panMode = !_panMode)),
-              XKey(
-                  label: 'Tab',
-                  color: kXviewTealDark,
-                  textColor: Colors.white,
-                  fontSize: 14,
-                  onPress: () => _keys.tap('Tab')),
-            ])),
+            child: _panel(_strip(xFullLeft)),
           ),
           Positioned(
             left: w - bar,
             top: 0,
             width: bar,
             height: h,
-            child: _panel(_fullStrip([
-              _stripKey(Icons.zoom_in, 'Zoom in', false, () => _zoom(1.1),
-                  repeat: true),
-              _stripKey(Icons.zoom_out, 'Zoom out', false, () => _zoom(0.9),
-                  repeat: true),
-              _stripKey(Icons.fit_screen, 'Fit', false, _fitToHole),
-              XKey(
-                  icon: Icons.keyboard_return,
-                  label: 'Enter',
-                  color: kXviewTeal,
-                  textColor: Colors.white,
-                  onPress: () => _keys.tap('Enter')),
-            ])),
+            child: _panel(_strip(xFullRight)),
           ),
+          if (_more)
+            Positioned(
+              left: bar + 8,
+              top: 8,
+              child: _panel(_morePanel()),
+            ),
+          widget.phoneKeyboardField,
         ]);
       }
       if (xviewIsTablet) return _tablet(w, h, remote);
@@ -271,28 +268,101 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
     });
   }
 
-  Widget _fullStrip(List<Widget> keys) => Padding(
-        padding: const EdgeInsets.all(6),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (final k in keys)
-              Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: SizedBox(height: 60, child: k)),
-          ],
+  /// A full-screen side strip, drawn from xFullLeft / xFullRight.
+  Widget _strip(List<Object> rows) => Padding(
+        padding: const EdgeInsets.all(4),
+        child: XKeyboardHalf(
+          rows: rows,
+          columns: 1,
+          controller: _keys,
+          slots: {
+            'scrollup': XKey(
+                icon: Icons.keyboard_double_arrow_up,
+                label: 'Scroll up',
+                repeat: true,
+                color: kXviewKeyDark,
+                onPress: () => _wheel(1)),
+            'scrolldown': XKey(
+                icon: Icons.keyboard_double_arrow_down,
+                label: 'Scroll down',
+                repeat: true,
+                color: kXviewKeyDark,
+                onPress: () => _wheel(-1)),
+            'hold': const _HoldKey(),
+            'mouse': XKey(
+                icon: gFFI.ffiModel.touchMode ? Icons.touch_app : Icons.mouse,
+                label: gFFI.ffiModel.touchMode ? 'Touch' : 'Mouse',
+                active: !gFFI.ffiModel.touchMode,
+                color: kXviewKeyDark,
+                onPress: () {
+                  gFFI.ffiModel.toggleTouchMode();
+                  setState(() {});
+                }),
+            'more': XKey(
+                icon: Icons.more_horiz,
+                label: 'More',
+                active: _more,
+                color: kXviewKeyDark,
+                onPress: () => setState(() => _more = !_more)),
+            'phonekb': XKey(
+                icon: Icons.keyboard_alt_outlined,
+                label: 'Phone keyboard',
+                active: _phoneKeyboardOpen,
+                color: kXviewKeyDark,
+                onPress: _togglePhoneKeyboard),
+          },
         ),
       );
 
-  Widget _stripKey(IconData icon, String label, bool active, VoidCallback onTap,
-          {bool repeat = false}) =>
-      XKey(
-          icon: icon,
-          label: label,
-          active: active,
-          repeat: repeat,
-          color: kXviewKeyDark,
-          onPress: onTap);
+  /// The less-used controls, opened from the More key.
+  Widget _morePanel() {
+    Widget item(IconData? icon, String label, VoidCallback onTap,
+            {bool repeat = false, bool active = false, bool close = true}) =>
+        SizedBox(
+          width: 76,
+          height: 64,
+          child: Column(children: [
+            Expanded(
+              child: XKey(
+                  icon: icon,
+                  label: label,
+                  repeat: repeat,
+                  active: active,
+                  color: kXviewKeyDark,
+                  onPress: () {
+                    onTap();
+                    if (close) setState(() => _more = false);
+                  }),
+            ),
+            Text(label,
+                style: const TextStyle(color: kXviewMuted, fontSize: 10)),
+          ]),
+        );
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: kXviewPanel,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kXviewKeyDark),
+      ),
+      child: Wrap(spacing: 4, runSpacing: 4, children: [
+        item(Icons.zoom_out, 'Zoom out', () => _zoom(0.9),
+            repeat: true, close: false),
+        item(Icons.zoom_in, 'Zoom in', () => _zoom(1.1),
+            repeat: true, close: false),
+        item(Icons.fit_screen, 'Fit', _fitToHole),
+        item(Icons.open_with, 'Pan', () => setState(() => _panMode = !_panMode),
+            active: _panMode),
+        item(Icons.keyboard, xviewIsTablet ? 'Keyboard' : 'Split keys',
+            () => _setFull(false)),
+        if (!xviewIsTablet)
+          item(Icons.screen_rotation, 'Portrait',
+              () => xviewToggleOrientation(context)),
+        item(Icons.arrow_back, 'Disconnect',
+            () => clientClose(gFFI.sessionId, gFFI)),
+      ]),
+    );
+  }
 
   Widget _leftHalf() => Padding(
         padding: const EdgeInsets.fromLTRB(4, 4, 2, 6),

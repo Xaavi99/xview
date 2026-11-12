@@ -78,6 +78,13 @@ const xFnRows = <int, String>{
   4: 'F11 F12 Ins PrtSc',
 };
 
+/// Full-screen side strips, top to bottom (each row is one key, so use
+/// one token per row). Phones open sessions in full screen; these are the
+/// keys that stay on screen there. Slots the app fills: @scrollup
+/// @scrolldown @hold @mouse @more @phonekb.
+const xFullLeft = <Object>['@scrollup', '@scrolldown', '@hold', '@mouse', '@more'];
+const xFullRight = <Object>['@phonekb', 'Tab', 'Enter', 'Esc', 'Bksp'];
+
 /// Tablet keyboard (OnePlus Pad 2 and other screens 600+ wide on their
 /// short side): one full laptop-style keyboard, 15 columns, 6 rows.
 const xTabletColumns = 15;
