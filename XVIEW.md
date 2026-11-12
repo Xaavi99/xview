@@ -111,7 +111,8 @@ The Android workflow also has a `check-xview-dart` job: `flutter analyze` on the
 
 Last good builds:
 - Windows with icon: run `38000949221`
-- Android, tablet layout (OnePlus Pad 2) + Tab/Enter in full screen: run `42376299634` (commit `23f2352`). Not yet tested on a device.
+- Android, full screen as the phone's main screen (strips from layout.dart, More panel, phone keyboard key): run `43227354173` (commit `9b03430`). Not yet tested on a device.
+- Android, tablet layout (OnePlus Pad 2) + Tab/Enter in full screen: run `42376299634` (commit `23f2352`). Full screen liked on the phone.
 - Android, Hold mouse button and tap-then-drag: run `42275632560` (commit `2112a2a`).
 - Android, visible pointer (own cursor layer, show-remote-cursor on): run `42022181983` (commit `5260680`).
 - Android, full screen fixed (own fit, side strips with Keys, Touch/Mouse, Pan, zoom, Fit): run `42012479906` (commit `0caf224`). Tested: pointer missing in the view and full screen.
