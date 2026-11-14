@@ -40,28 +40,52 @@ class _XKeyState extends State<XKey> {
   Timer? _delay;
   Timer? _repeat;
 
+  /// Fingers currently on this key. Repeating only runs while at least one
+  /// is down: a second touch used to start a second timer and leave the
+  /// first one running forever (an endless Backspace).
+  int _pointers = 0;
+
+  void _cancelTimers() {
+    _delay?.cancel();
+    _repeat?.cancel();
+    _delay = null;
+    _repeat = null;
+  }
+
   void _start() {
+    _pointers++;
     HapticFeedback.selectionClick();
     widget.onPress();
     setState(() => _down = true);
-    if (widget.repeat) {
-      _delay = Timer(const Duration(milliseconds: 380), () {
-        _repeat = Timer.periodic(
-            const Duration(milliseconds: 70), (_) => widget.onPress());
+    if (widget.repeat && _pointers == 1) {
+      _cancelTimers();
+      final started = DateTime.now();
+      _delay = Timer(const Duration(milliseconds: 450), () {
+        _repeat = Timer.periodic(const Duration(milliseconds: 70), (t) {
+          // Safety net: never repeat without a finger down, or for ever.
+          if (!mounted ||
+              _pointers == 0 ||
+              DateTime.now().difference(started) > const Duration(seconds: 20)) {
+            t.cancel();
+            return;
+          }
+          widget.onPress();
+        });
       });
     }
   }
 
   void _stop() {
-    _delay?.cancel();
-    _repeat?.cancel();
+    if (_pointers > 0) _pointers--;
+    if (_pointers > 0) return;
+    _cancelTimers();
     if (mounted) setState(() => _down = false);
   }
 
   @override
   void dispose() {
-    _delay?.cancel();
-    _repeat?.cancel();
+    _pointers = 0;
+    _cancelTimers();
     super.dispose();
   }
 
