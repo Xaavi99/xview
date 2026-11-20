@@ -22,6 +22,7 @@ import 'package:xview_keyboard/xview_keyboard.dart';
 import '../common.dart';
 import '../common/widgets/dialog.dart';
 import '../common/widgets/remote_input.dart';
+import '../consts.dart';
 import '../models/input_model.dart';
 import '../models/platform_model.dart';
 import 'xview.dart';
@@ -80,9 +81,54 @@ final _keys = XKeyboardController(send: _sendKey);
 /// even when RustDesk rebuilds this part of the screen.
 bool _fullChoice = true;
 
+/// Movie mode: laptop sound on, best picture, 60 fps, nothing but the
+/// picture on screen. Kept outside the widget for the same reason.
+bool _movieOn = false;
+
+/// What to put back when Movie mode ends ("quality|fps"). Saved as an
+/// option, so a session closed in Movie mode is put back next time.
+const _kMovieRestore = 'xview-movie-restore';
+
+Future<void> _setMovieSettings(bool on) async {
+  final sid = gFFI.sessionId;
+  const mute = 'disable-audio';
+  if (on) {
+    final quality = await bind.sessionGetImageQuality(sessionId: sid) ?? '';
+    final fps = await bind.sessionGetOption(sessionId: sid, arg: 'custom-fps') ?? '';
+    await bind.mainSetLocalOption(key: _kMovieRestore, value: '$quality|$fps');
+    if (bind.sessionGetToggleOptionSync(sessionId: sid, arg: mute)) {
+      await bind.sessionToggleOption(sessionId: sid, value: mute);
+    }
+    await bind.sessionSetImageQuality(sessionId: sid, value: kRemoteImageQualityBest);
+    await bind.sessionSetCustomFps(sessionId: sid, fps: 60);
+  } else {
+    await _restoreAfterMovie();
+  }
+}
+
+/// Puts sound, quality and fps back as they were before Movie mode.
+Future<void> _restoreAfterMovie() async {
+  final saved = bind.mainGetLocalOption(key: _kMovieRestore);
+  if (saved.isEmpty) return;
+  final sid = gFFI.sessionId;
+  final parts = saved.split('|');
+  final quality = parts.isNotEmpty && parts[0].isNotEmpty
+      ? parts[0]
+      : kRemoteImageQualityBalanced;
+  final fps = parts.length > 1 ? int.tryParse(parts[1]) ?? 30 : 30;
+  if (!bind.sessionGetToggleOptionSync(sessionId: sid, arg: 'disable-audio')) {
+    await bind.sessionToggleOption(sessionId: sid, value: 'disable-audio');
+  }
+  await bind.sessionSetImageQuality(sessionId: sid, value: quality);
+  await bind.sessionSetCustomFps(sessionId: sid, fps: fps);
+  await bind.mainSetLocalOption(key: _kMovieRestore, value: '');
+}
+
 class _XviewRemoteBodyState extends State<XviewRemoteBody> {
-  bool _full = !xviewIsTablet && _fullChoice;
+  bool _full = !xviewIsTablet && _fullChoice || _movieOn;
   bool _more = false;
+  bool _movieControls = true;
+  Timer? _movieTimer;
   bool _pad = false;
   bool _panMode = false;
   Rect? _hole;
@@ -100,12 +146,15 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
     gFFI.imageModel.addCallbackOnFirstImage((_) {
       _scheduleFit();
       _showRemoteCursor();
+      // A session that was closed in Movie mode gets its settings back.
+      if (!_movieOn) _restoreAfterMovie();
     });
   }
 
   @override
   void dispose() {
     _fitTimer?.cancel();
+    _movieTimer?.cancel();
     _keys.removeListener(_rebuild);
     super.dispose();
   }
@@ -164,6 +213,73 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
     _scheduleFit();
   }
 
+  void _setMovie(bool on) {
+    _movieOn = on;
+    _setMovieSettings(on);
+    setState(() {
+      _movieControls = true;
+      _more = false;
+      _panMode = false;
+      if (on) _full = true;
+    });
+    if (on) _wakeMovieControls();
+    _scheduleFit();
+  }
+
+  /// Movie controls show on any touch and fade after a few seconds.
+  void _wakeMovieControls() {
+    if (!_movieControls) setState(() => _movieControls = true);
+    _movieTimer?.cancel();
+    _movieTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _movieControls = false);
+    });
+  }
+
+  Widget _movieScreen(double w, double h, Widget remote) {
+    final bar = max(0.0, ((w - h * 16 / 9) / 2).floorToDouble());
+    final rect = Rect.fromLTWH(bar, 0, w - 2 * bar, h);
+    if (rect != _fullRect) {
+      _fullRect = rect;
+      _scheduleFit();
+    }
+    Widget control(IconData icon, String label, VoidCallback onTap) => SizedBox(
+          width: 56,
+          height: 48,
+          child: XKey(
+              icon: icon,
+              label: label,
+              color: const Color(0xCC1F2A2D),
+              onPress: onTap),
+        );
+    return Stack(children: [
+      remote,
+      const Positioned.fill(child: _CursorLayer()),
+      // Sees every touch (to show the controls) and lets it through to the
+      // laptop, so player buttons on the laptop still work.
+      Positioned.fill(
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => _wakeMovieControls(),
+        ),
+      ),
+      Positioned(
+        top: 8,
+        right: 8,
+        child: AnimatedOpacity(
+          opacity: _movieControls ? 1 : 0.15,
+          duration: const Duration(milliseconds: 300),
+          child: Row(children: [
+            control(Icons.play_arrow, 'Play or pause (Space)',
+                () => _keys.tap('Space')),
+            const SizedBox(width: 6),
+            control(Icons.close_fullscreen, 'Exit movie mode',
+                () => _setMovie(false)),
+          ]),
+        ),
+      ),
+    ]);
+  }
+
   bool get _phoneKeyboardOpen => MediaQuery.of(context).viewInsets.bottom > 0;
 
   void _togglePhoneKeyboard() {
@@ -189,6 +305,7 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
     return LayoutBuilder(builder: (context, c) {
       final w = c.maxWidth;
       final h = c.maxHeight;
+      if (_movieOn) return _movieScreen(w, h, remote);
       if (_full) {
         // Side strips hold the controls; the picture fits between them.
         final bar = max(64.0, ((w - h * 16 / 9) / 2).floorToDouble());
@@ -353,6 +470,7 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
         item(Icons.fit_screen, 'Fit', _fitToHole),
         item(Icons.open_with, 'Pan', () => setState(() => _panMode = !_panMode),
             active: _panMode),
+        item(Icons.movie_outlined, 'Movie', () => _setMovie(true)),
         item(Icons.keyboard, xviewIsTablet ? 'Keyboard' : 'Split keys',
             () => _setFull(false)),
         if (!xviewIsTablet)
@@ -580,6 +698,11 @@ class _XviewRemoteBodyState extends State<XviewRemoteBody> {
             label: 'Full screen',
             color: kXviewKeyDark,
             onPress: () => _setFull(true))),
+        key(XKey(
+            icon: Icons.movie_outlined,
+            label: 'Movie mode',
+            color: kXviewKeyDark,
+            onPress: () => _setMovie(true))),
         key(XKey(
             icon: Icons.keyboard_alt_outlined,
             label: 'Phone keyboard',
